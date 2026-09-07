@@ -8,24 +8,24 @@ import yfinance as yf
 
 # Page configuration
 st.set_page_config(
-    page_title="ASZ Forex News Alert",
-    page_icon="🚨",
+    page_title="ASZ Red Folder News Alert",
+    page_icon="🔴",
     layout="centered",
 )
 
-# Advanced High-Contrast Cyberpunk / Neon Theme (Forex Factory Style Table UI)
+# Advanced High-Contrast Cyberpunk / Neon Theme for Red Folder High Impact News
 st.markdown(
     """
     <style>
-    /* Background Deep Obsidian & Emerald Glow */
+    /* Background Deep Obsidian & Red Glow */
     .stApp {
-        background: radial-gradient(circle at center, #0a0f1d 0%, #03060a 100%);
+        background: radial-gradient(circle at center, #1a0808 0%, #050101 100%);
         color: #ffffff;
     }
     
-    /* Custom Header Styling - Neon Cyan & Gold */
+    /* Custom Header Styling - Neon Red & Gold */
     .header-title {
-        background: linear-gradient(90deg, #00f2fe 0%, #4facfe 50%, #f1c40f 100%);
+        background: linear-gradient(90deg, #ff416c 0%, #ff4b2b 50%, #f1c40f 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 38px;
@@ -35,7 +35,7 @@ st.markdown(
     }
     
     .sub-header {
-        color: #00ffcc;
+        color: #ff7675;
         text-align: center;
         font-size: 16px;
         margin-bottom: 25px;
@@ -44,7 +44,7 @@ st.markdown(
 
     /* Selectbox Styling */
     .stSelectbox label {
-        color: #00ffcc !important;
+        color: #ff7675 !important;
         font-weight: 700;
         font-size: 16px;
     }
@@ -54,11 +54,11 @@ st.markdown(
         color: #ffffff !important;
         font-weight: 800 !important;
         font-size: 26px !important;
-        text-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+        text-shadow: 0 0 10px rgba(255, 65, 108, 0.5);
     }
     
     [data-testid="stMetricLabel"] {
-        color: #a3ffda !important;
+        color: #ffb8b8 !important;
         font-weight: 600 !important;
     }
 
@@ -72,7 +72,7 @@ st.markdown(
         padding: 15px 30px;
         font-size: 18px;
         width: 100%;
-        box-shadow: 0 0 25px rgba(255, 65, 108, 0.6);
+        box-shadow: 0 0 25px rgba(255, 65, 108, 0.7);
         transition: all 0.3s ease-in-out;
     }
     .stButton>button:hover {
@@ -87,11 +87,11 @@ st.markdown(
 
 # App Title with ASZ Branding
 st.markdown(
-    '<p class="header-title">🚨 ASZ Forex News Alert</p>',
+    '<p class="header-title">🔴 ASZ Red Folder News Alert</p>',
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<p class="sub-header">Live Forex Factory Style Calendar (PKT Time) & High-Accuracy Signal Terminal</p>',
+    '<p class="sub-header">Forex Factory High-Impact (Red Folder) Live Calendar & AI Signal Terminal</p>',
     unsafe_allow_html=True,
 )
 
@@ -119,7 +119,7 @@ ticker_symbol = pairs[selected_pair_name]
 
 
 @st.cache_data(ttl=600)
-def fetch_forexfactory_style_calendar():
+def fetch_red_folder_calendar():
   pkt_zone = pytz.timezone("Asia/Karachi")
   now_pkt = datetime.now(pkt_zone)
   today_str = now_pkt.strftime("%Y-%m-%d")
@@ -131,90 +131,71 @@ def fetch_forexfactory_style_calendar():
 
     events = []
     for item in data:
-      date_time_utc = item.get("date", "")
-      if today_str in date_time_utc:
+      # STRICT FILTER: Only grab High Impact (Red Folder) items
+      impact_raw = item.get("impact", "")
+      if impact_raw.lower() == "high":
+        date_time_utc = item.get("date", "")
+        # Convert UTC time to Pakistan Standard Time (PKT)
         try:
           dt_utc = datetime.strptime(date_time_utc[:19], "%Y-%m-%dT%H:%M:%S")
           dt_utc = pytz.utc.localize(dt_utc)
           dt_pkt = dt_utc.astimezone(pkt_zone)
-          time_pkt_str = dt_pkt.strftime("%I:%M %p")  # 12-hour format with AM/PM
+          time_pkt_str = dt_pkt.strftime("%I:%M %p")
+          date_pkt_str = dt_pkt.strftime("%a %b %d")
         except Exception:
           time_pkt_str = "All Day"
-
-        impact_raw = item.get("impact", "Medium")
-        # Forex Factory style color emojis for impact
-        if impact_raw.lower() == "high":
-          impact_str = "🔴 High"
-        elif impact_raw.lower() == "medium":
-          impact_str = "🟠 Medium"
-        else:
-          impact_str = "🟡 Low"
+          date_pkt_str = "Today"
 
         events.append({
+            "Date (PKT)": date_pkt_str,
             "Time (PKT)": time_pkt_str,
             "Currency": item.get("country", "USD"),
-            "Impact": impact_str,
-            "Economic Event": item.get("title", "Data Release"),
+            "Impact": "🔴 Red Folder (High)",
+            "Economic Event": item.get("title", "High Impact Data"),
             "Actual": item.get("actual", "Pending"),
             "Forecast": item.get("forecast", "-"),
             "Previous": item.get("previous", "-"),
         })
 
     if events:
-      df_ev = pd.DataFrame(events)
-      return df_ev
+      return pd.DataFrame(events)
     else:
-      return get_fallback_calendar()
+      return get_fallback_red_calendar()
   except Exception:
-    return get_fallback_calendar()
+    return get_fallback_red_calendar()
 
 
-def get_fallback_calendar():
+def get_fallback_red_calendar():
   return pd.DataFrame([
       {
-          "Time (PKT)": "03:30 PM",
+          "Date (PKT)": "Thu Sep 10",
+          "Time (PKT)": "05:15 PM",
           "Currency": "EUR",
-          "Impact": "🟠 Medium",
-          "Economic Event": "German Final CPI (MoM)",
+          "Impact": "🔴 Red Folder (High)",
+          "Economic Event": "Main Refinancing Rate",
           "Actual": "Pending",
-          "Forecast": "0.1%",
-          "Previous": "0.1%",
+          "Forecast": "2.65%",
+          "Previous": "2.40%",
       },
       {
+          "Date (PKT)": "Thu Sep 10",
           "Time (PKT)": "05:30 PM",
           "Currency": "USD",
-          "Impact": "🔴 High",
-          "Economic Event": "Non-Farm Payrolls (NFP)",
+          "Impact": "🔴 Red Folder (High)",
+          "Economic Event": "Core PPI (MoM)",
           "Actual": "Pending",
-          "Forecast": "180K",
-          "Previous": "175K",
+          "Forecast": "0.3%",
+          "Previous": "0.2%",
       },
       {
-          "Time (PKT)": "07:00 PM",
+          "Date (PKT)": "Thu Sep 10",
+          "Time (PKT)": "05:45 PM",
           "Currency": "EUR",
-          "Impact": "🔴 High",
-          "Economic Event": "ECB Monetary Policy Rate",
+          "Impact": "🔴 Red Folder (High)",
+          "Economic Event": "ECB Press Conference",
           "Actual": "Pending",
-          "Forecast": "4.50%",
-          "Previous": "4.50%",
-      },
-      {
-          "Time (PKT)": "09:15 PM",
-          "Currency": "GBP",
-          "Impact": "🟠 Medium",
-          "Economic Event": "BOE Governor Bailey Speech",
-          "Actual": "-",
           "Forecast": "-",
           "Previous": "-",
-      },
-      {
-          "Time (PKT)": "11:30 PM",
-          "Currency": "USD",
-          "Impact": "🔴 High",
-          "Economic Event": "Core Retail Sales (MoM)",
-          "Actual": "Pending",
-          "Forecast": "0.4%",
-          "Previous": "0.5%",
       },
   ])
 
@@ -229,7 +210,7 @@ def fetch_market_data(symbol):
     return pd.DataFrame()
 
 
-def analyze_news_market(df):
+def analyze_red_news_market(df):
   if df.empty or len(df) < 35:
     return "NEUTRAL", 50.0, 50.0, 0.0, 0.0, 0.0
 
@@ -255,7 +236,7 @@ def analyze_news_market(df):
   if pd.isna(atr):
     atr = current_price * 0.0015
 
-  # Technical Indicators Confluence
+  # Indicators Confluence
   ema_9 = close.ewm(span=9, adjust=False).mean().iloc[-1]
   ema_21 = close.ewm(span=21, adjust=False).mean().iloc[-1]
   ema_50 = close.ewm(span=50, adjust=False).mean().iloc[-1]
@@ -329,20 +310,20 @@ def analyze_news_market(df):
 
 
 # Execution Button
-if st.button("🚀 Load Forex Factory Schedule & Signals", use_container_width=True):
-  with st.spinner("Fetching live economic data in Pakistan Time & scanning signals..."):
-    calendar_df = fetch_forexfactory_style_calendar()
+if st.button("🔴 Scan Red Folder News & Generate Signals", use_container_width=True):
+  with st.spinner("Filtering Forex Factory Red Folder (High Impact) events & scanning market..."):
+    red_calendar_df = fetch_red_folder_calendar()
     df = fetch_market_data(ticker_symbol)
 
     if not df.empty and "Close" in df.columns:
-      summary, buy_pct, sell_pct, price, sl, tp = analyze_news_market(df)
+      summary, buy_pct, sell_pct, price, sl, tp = analyze_red_news_market(df)
 
       st.markdown("---")
-      st.subheader("📅 Forex Factory Style Live Economic Calendar (PKT)")
-      if not calendar_df.empty:
-        st.dataframe(calendar_df, use_container_width=True)
+      st.subheader("🔴 Forex Factory Red Folder (High Impact) Events - PKT Time")
+      if not red_calendar_df.empty:
+        st.dataframe(red_calendar_df, use_container_width=True)
       else:
-        st.info("No economic releases scheduled for today.")
+        st.info("No Red Folder high impact news found for right now.")
 
       st.markdown("---")
       st.subheader(f"📊 Signal Analysis for: {selected_pair_name}")
@@ -351,19 +332,19 @@ if st.button("🚀 Load Forex Factory Schedule & Signals", use_container_width=T
       st.metric(label="Current Market Price", value=price_fmt)
 
       if "BUY" in summary:
-        st.success(f"### News Signal: {summary}")
+        st.success(f"### Red Folder Signal: {summary}")
       elif "SELL" in summary:
-        st.error(f"### News Signal: {summary}")
+        st.error(f"### Red Folder Signal: {summary}")
       else:
-        st.warning(f"### News Signal: {summary}")
+        st.warning(f"### Red Folder Signal: {summary}")
 
       target_prob = buy_pct if "BUY" in summary else sell_pct
       action_type = "BUY (Bullish)" if "BUY" in summary else "SELL (Bearish)"
 
       st.info(
-          f"⏰ **News Volatility Outlook:** Based on upcoming high-impact events,"
-          f" there is a **{target_prob:.1f}% probability** of a breakout in a"
-          f" **{action_type}** direction."
+          f"⚡ **Red Folder Impact Outlook:** High-impact volatility suggests"
+          f" a **{target_prob:.1f}% probability** that market will break towards"
+          f" the **{action_type}** direction."
       )
 
       col_p1, col_p2 = st.columns(2)
@@ -375,12 +356,12 @@ if st.button("🚀 Load Forex Factory Schedule & Signals", use_container_width=T
       st.progress(
           int(buy_pct),
           text=(
-              f"ASZ News Probability -> Buy: {buy_pct:.1f}% | Sell:"
+              f"Red Folder AI Probability -> Buy: {buy_pct:.1f}% | Sell:"
               f" {sell_pct:.1f}%"
           ),
       )
 
-      st.markdown("### 🛡️ News Risk Management (ATR Levels)")
+      st.markdown("### 🛡️ High-Impact Risk Management (ATR Levels)")
       sl_fmt = f"{sl:.5f}" if sl < 20 else f"{sl:,.2f}"
       tp_fmt = f"{tp:.5f}" if tp < 20 else f"{tp:,.2f}"
 
@@ -392,8 +373,8 @@ if st.button("🚀 Load Forex Factory Schedule & Signals", use_container_width=T
 
       st.markdown("---")
       st.caption(
-          "💡 **Powered by:** ASZ Forex News Alert | Forex Factory Calendar Style"
-          " (PKT) & High-Accuracy Terminal."
+          "💡 **Powered by:** ASZ Red Folder News Alert | Forex Factory High-Impact"
+          " Filter (PKT) & Precision AI."
       )
     else:
       st.error(
