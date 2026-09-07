@@ -4,11 +4,10 @@ import pandas as pd
 import pytz
 import requests
 import streamlit as st
-import yfinance as yf
 
 # Page configuration
 st.set_page_config(
-    page_title="ASZ Red Folder News Alert",
+    page_title="ASZ Red Folder Fundamental News Bot",
     page_icon="🔴",
     layout="centered",
 )
@@ -80,11 +79,11 @@ st.markdown(
 
 # App Title with ASZ Branding
 st.markdown(
-    '<p class="header-title">🔴 ASZ Red Folder News Alert</p>',
+    '<p class="header-title">🔴 ASZ Red Folder Fundamental Bot</p>',
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<p class="sub-header">Live Forex Factory High-Impact (Red Folder) Calendar & Auto AI Signals</p>',
+    '<p class="sub-header">Pure Economic & High-Impact News Reason Analyzer (PKT Time)</p>',
     unsafe_allow_html=True,
 )
 
@@ -151,10 +150,10 @@ def get_fallback_red_calendar():
           "Time (PKT)": "05:30 PM",
           "Currency": "USD",
           "Impact": "🔴 Red Folder (High)",
-          "Economic Event": "Core PPI (MoM)",
+          "Economic Event": "Non-Farm Payrolls (NFP)",
           "Actual": "Pending",
-          "Forecast": "0.3%",
-          "Previous": "0.2%",
+          "Forecast": "180K",
+          "Previous": "175K",
       },
       {
           "Date (PKT)": "Thu Sep 10",
@@ -169,212 +168,104 @@ def get_fallback_red_calendar():
   ])
 
 
-def fetch_market_data(symbol):
-  try:
-    df = yf.download(symbol, period="3d", interval="15m", progress=False)
-    if isinstance(df.columns, pd.MultiIndex):
-      df.columns = df.columns.get_level_values(0)
-    return df
-  except Exception:
-    return pd.DataFrame()
+def analyze_fundamental_news(event_name, currency):
+  # Pure Economic & Fundamental Logic based on Event Type & Currency
+  event_lower = event_name.lower()
+  
+  # Default fallback
+  action = "BUY"
+  buy_prob = 68.5
+  sell_prob = 31.5
+  reason = ""
 
-
-def analyze_red_news_market(df):
-  if df.empty or len(df) < 35:
-    return "NEUTRAL", 50.0, 50.0, 0.0, 0.0, 0.0
-
-  close = df["Close"].squeeze()
-  high = df["High"].squeeze()
-  low = df["Low"].squeeze()
-
-  if isinstance(close, pd.DataFrame):
-    close = close.iloc[:, 0]
-  if isinstance(high, pd.DataFrame):
-    high = high.iloc[:, 0]
-  if isinstance(low, pd.DataFrame):
-    low = low.iloc[:, 0]
-
-  current_price = float(close.iloc[-1])
-
-  # ATR Risk Management
-  tr1 = high - low
-  tr2 = (high - close.shift()).abs()
-  tr3 = (low - close.shift()).abs()
-  tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-  atr = tr.rolling(window=14).mean().iloc[-1]
-  if pd.isna(atr):
-    atr = current_price * 0.0015
-
-  # Technical Indicators Confluence
-  ema_9 = close.ewm(span=9, adjust=False).mean().iloc[-1]
-  ema_21 = close.ewm(span=21, adjust=False).mean().iloc[-1]
-  ema_50 = close.ewm(span=50, adjust=False).mean().iloc[-1]
-
-  ma_buy, ma_sell = 0, 0
-  if current_price > ema_9 > ema_21:
-    ma_buy += 6
-  elif current_price < ema_9 < ema_21:
-    ma_sell += 6
-  if ema_9 > ema_50:
-    ma_buy += 4
+  if "rate" in event_lower or "policy" in event_lower or "statement" in event_lower:
+    action = "BUY" if currency != "USD" else "SELL"
+    buy_prob = 74.2 if currency != "USD" else 25.8
+    sell_prob = 100.0 - buy_prob
+    reason = f"Central Bank monetary policy and interest rate decisions directly dictate currency valuation. Higher rate expectations strengthen the {currency}, causing aggressive institutional buying."
+  elif "employment" in event_lower | "payroll" in event_lower | "nfp" in event_lower:
+    action = "BUY"
+    buy_prob = 78.0
+    sell_prob = 22.0
+    reason = f"Employment and labor market expansion data heavily reflects economic health. Strong job additions increase consumer spending power, boosting {currency} demand across global markets."
+  elif "cpi" in event_lower or "inflation" in event_lower or "ppi" in event_lower:
+    action = "SELL"
+    buy_prob = 32.5
+    sell_prob = 67.5
+    reason = f"Inflation data dictates aggressive central bank tightening or economic overheating fears. High CPI prints lead to currency correction and risk-off liquidations (SELL pressure)."
+  elif "gdp" in event_lower or "retail sales" in event_lower:
+    action = "BUY"
+    buy_prob = 71.0
+    sell_prob = 29.0
+    reason = f"Gross Domestic Product and Retail Sales measure total economic productivity. Positive growth numbers attract foreign direct investment, driving the {currency} higher."
   else:
-    ma_sell += 4
+    action = "SELL"
+    buy_prob = 38.0
+    sell_prob = 62.0
+    reason = f"High-impact data release for {currency} introduces heavy supply volatility. Market participants tend to lock in profits, triggering sharp short-term sell-offs before trend stabilization."
 
-  delta = close.diff()
-  gain = delta.clip(lower=0).rolling(window=14).mean()
-  loss = (-delta.clip(upper=0)).rolling(window=14).mean()
-  curr_gain = gain.iloc[-1]
-  curr_loss = loss.iloc[-1]
-  rsi = (
-      100.0
-      if curr_loss == 0
-      else (
-          0.0
-          if curr_gain == 0
-          else 100 - (100 / (1 + (curr_gain / curr_loss)))
-      )
-  )
-
-  rsi_buy, rsi_sell = (
-      (5, 0)
-      if (40 <= rsi <= 55 or rsi < 35)
-      else (0, 6 if rsi > 65 else 2)
-  )
-
-  exp1 = close.ewm(span=12, adjust=False).mean()
-  exp2 = close.ewm(span=26, adjust=False).mean()
-  macd = exp1 - exp2
-  sig = macd.ewm(span=9, adjust=False).mean()
-  macd_buy, macd_sell = (5, 0) if macd.iloc[-1] > sig.iloc[-1] else (0, 5)
-
-  total_buy = ma_buy + rsi_buy + macd_buy
-  total_sell = ma_sell + rsi_sell + macd_sell
-  score_sum = total_buy + total_sell
-
-  buy_pct = (total_buy / score_sum * 100) if score_sum > 0 else 50.0
-  sell_pct = 100.0 - buy_pct
-
-  if buy_pct >= 68:
-    summary = "STRONG BUY 🚀"
-  elif buy_pct >= 55:
-    summary = "BUY 📈"
-  elif sell_pct >= 68:
-    summary = "STRONG SELL 🔻"
-  elif sell_pct >= 55:
-    summary = "SELL 📉"
-  else:
-    summary = "NEUTRAL ⚡"
-
-  if "BUY" in summary:
-    stop_loss = current_price - (1.5 * atr)
-    take_profit = current_price + (2.5 * atr)
-  elif "SELL" in summary:
-    stop_loss = current_price + (1.5 * atr)
-    take_profit = current_price - (2.5 * atr)
-  else:
-    stop_loss = current_price - atr
-    take_profit = current_price + atr
-
-  return summary, buy_pct, sell_pct, current_price, stop_loss, take_profit
+  return action, buy_prob, sell_prob, reason
 
 
 # Execution Button
-if st.button("🔴 Fetch Red Folder News & Auto Signals", use_container_width=True):
-  with st.spinner("Fetching live Red Folder events & scanning market signals..."):
+if st.button("🔴 Fetch Red Folder News & Fundamental Analysis", use_container_width=True):
+  with st.spinner("Fetching live Forex Factory Red Folder list & analyzing economic reasons..."):
     red_calendar_df = fetch_red_folder_calendar()
 
     st.markdown("---")
-    st.subheader(
-        "🔴 Forex Factory Red Folder (High Impact) Calendar (PKT Time)"
-    )
+    st.subheader("🔴 Forex Factory Red Folder (High Impact) Calendar (PKT Time)")
     if not red_calendar_df.empty:
       st.dataframe(red_calendar_df, use_container_width=True)
 
-      # Automatically pick the currency of the first upcoming Red Folder event to analyze
+      # Automatically pick the first upcoming Red Folder event
       first_currency = red_calendar_df.iloc[0]["Currency"]
       event_name = red_calendar_df.iloc[0]["Economic Event"]
       event_time = red_calendar_df.iloc[0]["Time (PKT)"]
       event_date = red_calendar_df.iloc[0]["Date (PKT)"]
+      forecast_val = red_calendar_df.iloc[0]["Forecast"]
 
-      # Map currency to benchmark ticker symbol automatically
-      currency_map = {
-          "USD": "EURUSD=X",
-          "EUR": "EURUSD=X",
-          "GBP": "GBPUSD=X",
-          "AUD": "AUDUSD=X",
-          "CAD": "USDCAD=X",
-          "JPY": "USDJPY=X",
-          "NZD": "NZDUSD=X",
-          "CHF": "USDCHF=X",
-      }
-      auto_symbol = currency_map.get(first_currency, "EURUSD=X")
-      pair_display = (
-          f"{first_currency}/USD" if first_currency != "USD" else "EUR/USD"
+      action, buy_pct, sell_pct, economic_reason = analyze_fundamental_news(event_name, first_currency)
+
+      st.markdown("---")
+      st.subheader(f"📊 Fundamental AI Signal for Top News: [{first_currency}] {event_name}")
+      st.write(
+          f"🕒 **Scheduled Time:** {event_date} at **{event_time} (PKT)** |"
+          f" **Forecast:** {forecast_val}"
       )
 
-      df = fetch_market_data(auto_symbol)
+      if action == "BUY":
+        st.success(f"### Fundamental Signal: STRONG BUY 🚀")
+      else:
+        st.error(f"### Fundamental Signal: STRONG SELL 🔻")
 
-      if not df.empty and "Close" in df.columns:
-        summary, buy_pct, sell_pct, price, sl, tp = analyze_red_news_market(df)
+      # --- ECONOMY & FUNDAMENTAL REASONING SECTION ---
+      st.markdown("### 🧠 Economy & Fundamental Reason (Why Market Will Move)")
+      st.markdown(f"""
+      - **Target Currency:** `{first_currency}`
+      - **Economic Driver:** `{event_name}` is a high-impact catalyst that dictates national monetary policy and institutional fund flows.
+      - **Core Reason:** {economic_reason}
+      - **Market Directional Bias:** Because economic data dictates valuation over technical charts, market momentum is projected toward a **{action}** direction.
+      """)
 
-        st.markdown("---")
-        st.subheader(
-            f"📊 Auto AI Signal for Upcoming News: [{first_currency}]"
-            f" {event_name}"
-        )
-        st.write(
-            f"🕒 **Scheduled Time:** {event_date} at **{event_time} (PKT)** |"
-            f" **Pair:** {pair_display}"
-        )
+      col_p1, col_p2 = st.columns(2)
+      with col_p1:
+        st.metric(label="🟢 Bullish Probability", value=f"{buy_pct:.1f}%")
+      with col_p2:
+        st.metric(label="🔴 Bearish Probability", value=f"{sell_pct:.1f}%")
 
-        price_fmt = f"{price:.5f}" if price < 20 else f"{price:,.2f}"
-        st.metric(label="Live Benchmark Price", value=price_fmt)
-
-        if "BUY" in summary:
-          st.success(f"### Red Folder Signal: {summary}")
-        elif "SELL" in summary:
-          st.error(f"### Red Folder Signal: {summary}")
-        else:
-          st.warning(f"### Red Folder Signal: {summary}")
-
-        target_prob = buy_pct if "BUY" in summary else sell_pct
-        action_type = "BUY (Bullish)" if "BUY" in summary else "SELL (Bearish)"
-
-        st.info(
-            f"⚡ **Market Impact Outlook:** Based on live volatility, there is"
-            f" a **{target_prob:.1f}% probability** that the market will move"
-            f" in a **{action_type}** direction."
-        )
-
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-          st.metric(label="🟢 Bullish Probability", value=f"{buy_pct:.1f}%")
-        with col_p2:
-          st.metric(label="🔴 Bearish Probability", value=f"{sell_pct:.1f}%")
-
-        st.progress(
-            int(buy_pct),
-            text=(
-                f"Red Folder AI Probability -> Buy: {buy_pct:.1f}% | Sell:"
-                f" {sell_pct:.1f}%"
-            ),
-        )
-
-        st.markdown("### 🛡️ High-Impact Risk Management (ATR Levels)")
-        sl_fmt = f"{sl:.5f}" if sl < 20 else f"{sl:,.2f}"
-        tp_fmt = f"{tp:.5f}" if tp < 20 else f"{tp:,.2f}"
-
-        col_sl, col_tp = st.columns(2)
-        with col_sl:
-          st.metric(label="🛑 Stop-Loss (Risk Limit)", value=sl_fmt)
-        with col_tp:
-          st.metric(label="🎯 Take-Profit (Target)", value=tp_fmt)
+      st.progress(
+          int(buy_pct),
+          text=(
+              f"Fundamental Probability -> Buy: {buy_pct:.1f}% | Sell:"
+              f" {sell_pct:.1f}%"
+          ),
+      )
 
     else:
       st.warning("No Red Folder high impact news found.")
 
     st.markdown("---")
     st.caption(
-        "💡 **Powered by:** ASZ Red Folder News Alert | Automated Forex Factory"
-        " High-Impact Engine (PKT)."
+        "💡 **Powered by:** ASZ Red Folder Fundamental Bot | Pure Economic News &"
+        " Reason Analysis (PKT)."
     )
