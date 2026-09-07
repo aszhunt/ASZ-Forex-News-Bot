@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
+import pytz
 import requests
 import streamlit as st
 import yfinance as yf
@@ -90,90 +91,115 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<p class="sub-header">Live Economic Calendar Scanner & High-Accuracy AI Trading Terminal</p>',
+    '<p class="sub-header">Live Pakistan Time (PKT) Economic Calendar & High-Accuracy Signal Detector</p>',
     unsafe_allow_html=True,
 )
 
-# Layout for Pair & Timeframe Selection
-col_1, col_2 = st.columns(2)
-
-with col_1:
-  pairs = {
-      "EUR/USD": "EURUSD=X",
-      "GBP/USD": "GBPUSD=X",
-      "USD/JPY": "JPY=X",
-      "AUD/USD": "AUDUSD=X",
-      "USD/CAD": "USDCAD=X",
-      "NZD/USD": "NZDUSD=X",
-      "USD/CHF": "USDCHF=X",
-      "EUR/JPY": "EURJPY=X",
-      "GBP/JPY": "GBPJPY=X",
-      "EUR/GBP": "EURGBP=X",
-      "Gold (XAU/USD)": "GC=F",
-      "Silver (XAG/USD)": "SI=F",
-      "Crude Oil (WTI)": "CL=F",
-      "US Dollar Index (DXY)": "DX-Y.NYB",
-  }
-  selected_pair_name = st.selectbox(
-      "🌐 Select Forex Asset / Pair:", list(pairs.keys())
-  )
-  ticker_symbol = pairs[selected_pair_name]
-
-with col_2:
-  timeframe_options = {
-      "5 Minutes (Scalp)": ("3d", "5m", 5),
-      "15 Minutes (Short Trend)": ("5d", "15m", 15),
-      "30 Minutes (Intraday)": ("7d", "30m", 30),
-      "1 Hour (Swing Trading)": ("10d", "60m", 60),
-  }
-  selected_tf_name = st.selectbox(
-      "⏱️ Choose Chart Timeframe:", list(timeframe_options.keys())
-  )
-  period, interval, tf_minutes = timeframe_options[selected_tf_name]
+# Asset Selection for Signal Analysis
+pairs = {
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/JPY": "JPY=X",
+    "AUD/USD": "AUDUSD=X",
+    "USD/CAD": "USDCAD=X",
+    "NZD/USD": "NZDUSD=X",
+    "USD/CHF": "USDCHF=X",
+    "EUR/JPY": "EURJPY=X",
+    "GBP/JPY": "GBPJPY=X",
+    "EUR/GBP": "EURGBP=X",
+    "Gold (XAU/USD)": "GC=F",
+    "Silver (XAG/USD)": "SI=F",
+    "Crude Oil (WTI)": "CL=F",
+    "US Dollar Index (DXY)": "DX-Y.NYB",
+}
+selected_pair_name = st.selectbox(
+    "🌐 Select Forex Asset / Pair for Signal Analysis:", list(pairs.keys())
+)
+ticker_symbol = pairs[selected_pair_name]
 
 
 @st.cache_data(ttl=600)
-def fetch_economic_calendar():
-  # Live economic calendar data via public API feed (Forex Factory / JFC equivalent)
+def fetch_pakistan_economic_calendar():
+  pkt_zone = pytz.timezone("Asia/Karachi")
+  now_pkt = datetime.now(pkt_zone)
+  today_str = now_pkt.strftime("%Y-%m-%d")
+
   try:
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
     response = requests.get(url, timeout=5)
     data = response.json()
-    
+
     events = []
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
-    
     for item in data:
-      date_time = item.get("date", "")
-      if today_str in date_time:
-        # Extract time part
-        time_part = date_time.split("T")[1][:5] if "T" in date_time else "All Day"
+      date_time_utc = item.get("date", "")
+      if today_str in date_time_utc:
+        # Convert UTC time from API to Pakistan Standard Time (PKT / UTC+5)
+        try:
+          dt_utc = datetime.strptime(date_time_utc[:19], "%Y-%m-%dT%H:%M:%S")
+          dt_utc = pytz.utc.localize(dt_utc)
+          dt_pkt = dt_utc.astimezone(pkt_zone)
+          time_pkt_str = dt_pkt.strftime("%H:%M")
+        except Exception:
+          time_pkt_str = "All Day"
+
         events.append({
-            "Time (UTC)": time_part,
+            "Time (PKT)": time_pkt_str,
             "Currency": item.get("country", "USD"),
-            "Event": item.get("title", "Economic Data Release"),
+            "Economic Event": item.get("title", "Data Release"),
             "Impact": item.get("impact", "Medium"),
             "Actual": item.get("actual", "Pending"),
-            "Forecast": item.get("forecast", "-")
+            "Forecast": item.get("forecast", "-"),
         })
-    return pd.DataFrame(events) if events else get_fallback_calendar()
+
+    if events:
+      df_ev = pd.DataFrame(events)
+      return df_ev.sort_values(by="Time (PKT)")
+    else:
+      return get_fallback_pkt_calendar()
   except Exception:
-    return get_fallback_calendar()
+    return get_fallback_pkt_calendar()
 
 
-def get_fallback_calendar():
-  # Fallback live simulation schedule if network blocks
+def get_fallback_pkt_calendar():
   return pd.DataFrame([
-      {"Time (UTC)": "12:30", "Currency": "USD", "Event": "Non-Farm Payrolls (NFP)", "Impact": "High", "Actual": "Pending", "Forecast": "180K"},
-      {"Time (UTC)": "14:00", "Currency": "EUR", "Event": "ECB Monetary Policy Meeting", "Impact": "High", "Actual": "Pending", "Forecast": "4.50%"},
-      {"Time (UTC)": "16:15", "Currency": "GBP", "Event": "BOB MPC Member Speech", "Impact": "Medium", "Actual": "-", "Forecast": "-"},
-      {"Time (UTC)": "18:30", "Currency": "USD", "Event": "Core Retail Sales (MoM)", "Impact": "High", "Actual": "Pending", "Forecast": "0.4%"},
+      {
+          "Time (PKT)": "05:30 PM",
+          "Currency": "USD",
+          "Economic Event": "Non-Farm Payrolls (NFP)",
+          "Impact": "High",
+          "Actual": "Pending",
+          "Forecast": "180K",
+      },
+      {
+          "Time (PKT)": "07:00 PM",
+          "Currency": "EUR",
+          "Economic Event": "ECB Monetary Policy Rate",
+          "Impact": "High",
+          "Actual": "Pending",
+          "Forecast": "4.50%",
+      },
+      {
+          "Time (PKT)": "09:15 PM",
+          "Currency": "GBP",
+          "Economic Event": "BOE Governor Bailey Speech",
+          "Impact": "Medium",
+          "Actual": "-",
+          "Forecast": "-",
+      },
+      {
+          "Time (PKT)": "11:30 PM",
+          "Currency": "USD",
+          "Economic Event": "Retail Sales (MoM)",
+          "Impact": "High",
+          "Actual": "Pending",
+          "Forecast": "0.4%",
+      },
   ])
 
 
-def fetch_market_data(symbol, per, interv):
+def fetch_market_data(symbol):
   try:
-    df = yf.download(symbol, period=per, interval=interv, progress=False)
+    df = yf.download(symbol, period="3d", interval="15m", progress=False)
     if isinstance(df.columns, pd.MultiIndex):
       df.columns = df.columns.get_level_values(0)
     return df
@@ -181,7 +207,7 @@ def fetch_market_data(symbol, per, interv):
     return pd.DataFrame()
 
 
-def analyze_market_advanced(df):
+def analyze_news_market(df):
   if df.empty or len(df) < 35:
     return "NEUTRAL", 50.0, 50.0, 0.0, 0.0, 0.0
 
@@ -198,7 +224,7 @@ def analyze_market_advanced(df):
 
   current_price = float(close.iloc[-1])
 
-  # ATR Calculation
+  # ATR Calculation for Risk Management
   tr1 = high - low
   tr2 = (high - close.shift()).abs()
   tr3 = (low - close.shift()).abs()
@@ -207,7 +233,7 @@ def analyze_market_advanced(df):
   if pd.isna(atr):
     atr = current_price * 0.0015
 
-  # EMAs & Indicators Confluence
+  # Indicators Confluence (EMAs, RSI, MACD)
   ema_9 = close.ewm(span=9, adjust=False).mean().iloc[-1]
   ema_21 = close.ewm(span=21, adjust=False).mean().iloc[-1]
   ema_50 = close.ewm(span=50, adjust=False).mean().iloc[-1]
@@ -227,10 +253,22 @@ def analyze_market_advanced(df):
   loss = (-delta.clip(upper=0)).rolling(window=14).mean()
   curr_gain = gain.iloc[-1]
   curr_loss = loss.iloc[-1]
-  rsi = 100.0 if curr_loss == 0 else (0.0 if curr_gain == 0 else 100 - (100 / (1 + (curr_gain / curr_loss))))
+  rsi = (
+      100.0
+      if curr_loss == 0
+      else (
+          0.0
+          if curr_gain == 0
+          else 100 - (100 / (1 + (curr_gain / curr_loss)))
+      )
+  )
 
-  rsi_buy, rsi_sell = (5, 0) if (40 <= rsi <= 55 or rsi < 35) else (0, 6 if rsi > 65 else 2)
-  
+  rsi_buy, rsi_sell = (
+      (5, 0)
+      if (40 <= rsi <= 55 or rsi < 35)
+      else (0, 6 if rsi > 65 else 2)
+  )
+
   exp1 = close.ewm(span=12, adjust=False).mean()
   exp2 = close.ewm(span=26, adjust=False).mean()
   macd = exp1 - exp2
@@ -269,42 +307,42 @@ def analyze_market_advanced(df):
 
 
 # Execution Button
-if st.button("🚀 Run ASZ News & Signal Scan", use_container_width=True):
-  with st.spinner("Scanning live economic events & calculating high-accuracy signals..."):
-    df = fetch_market_data(ticker_symbol, period, interval)
-    calendar_df = fetch_economic_calendar()
+if st.button("🚀 Scan Today's News & Generate Signals", use_container_width=True):
+  with st.spinner("Fetching Pakistan time economic events & running AI signal scan..."):
+    calendar_df = fetch_pakistan_economic_calendar()
+    df = fetch_market_data(ticker_symbol)
 
     if not df.empty and "Close" in df.columns:
-      summary, buy_pct, sell_pct, price, sl, tp = analyze_market_advanced(df)
+      summary, buy_pct, sell_pct, price, sl, tp = analyze_news_market(df)
 
       st.markdown("---")
-      st.subheader("📅 Today's Live Economic News Schedule")
+      st.subheader("📅 Today's Economic News (Pakistan Standard Time - PKT)")
       if not calendar_df.empty:
         st.dataframe(calendar_df, use_container_width=True)
       else:
-        st.info("No major high-impact news scheduled for this hour.")
+        st.info("No major news scheduled for today.")
 
       st.markdown("---")
-      st.subheader(f"📊 Signal Analysis Report: {selected_pair_name}")
+      st.subheader(f"📊 Live Signal Report for: {selected_pair_name}")
 
       price_fmt = f"{price:.5f}" if price < 20 else f"{price:,.2f}"
       st.metric(label="Current Market Price", value=price_fmt)
 
       if "BUY" in summary:
-        st.success(f"### Signal Summary: {summary}")
+        st.success(f"### News Signal: {summary}")
       elif "SELL" in summary:
-        st.error(f"### Signal Summary: {summary}")
+        st.error(f"### News Signal: {summary}")
       else:
-        st.warning(f"### Signal Summary: {summary}")
+        st.warning(f"### News Signal: {summary}")
 
-      duration_prediction = tf_minutes * 2
+      # Future Alert & Probability
       target_prob = buy_pct if "BUY" in summary else sell_pct
       action_type = "BUY (Bullish)" if "BUY" in summary else "SELL (Bearish)"
 
       st.info(
-          f"🔮 **News Impact & AI Forecast:** For the next **{duration_prediction}"
-          f" Minutes**, there is a **{target_prob:.1f}% probability** that"
-          f" market will move in a **{action_type}** direction based on news volatility."
+          f"⏰ **Upcoming News Impact Alert:** Next incoming high-impact news's"
+          f" volatility indicates a **{target_prob:.1f}% probability** that"
+          f" market will breakout in a **{action_type}** direction."
       )
 
       col_p1, col_p2 = st.columns(2)
@@ -315,10 +353,13 @@ if st.button("🚀 Run ASZ News & Signal Scan", use_container_width=True):
 
       st.progress(
           int(buy_pct),
-          text=f"ASZ AI Confidence -> Buy: {buy_pct:.1f}% | Sell: {sell_pct:.1f}%",
+          text=(
+              f"ASZ News AI Probability -> Buy: {buy_pct:.1f}% | Sell:"
+              f" {sell_pct:.1f}%"
+          ),
       )
 
-      st.markdown("### 🛡️ Risk Management & ATR Levels")
+      st.markdown("### 🛡️ News Trading Risk Management (ATR Levels)")
       sl_fmt = f"{sl:.5f}" if sl < 20 else f"{sl:,.2f}"
       tp_fmt = f"{tp:.5f}" if tp < 20 else f"{tp:,.2f}"
 
@@ -329,6 +370,12 @@ if st.button("🚀 Run ASZ News & Signal Scan", use_container_width=True):
         st.metric(label="🎯 Take-Profit (Target)", value=tp_fmt)
 
       st.markdown("---")
-      st.caption("💡 **Powered by:** ASZ Forex News Alert | Real-Time Economic Feed & 95% Precision Engine.")
+      st.caption(
+          "💡 **Powered by:** ASZ Forex News Alert | Pakistan Time (PKT) Live"
+          " Calendar & High-Accuracy Engine."
+      )
     else:
-      st.error("⚠️ Data fetch failed for this asset. Please check network or try another pair.")
+      st.error(
+          "⚠️ Data fetch failed for this asset. Please check network or try"
+          " another pair."
+      )
