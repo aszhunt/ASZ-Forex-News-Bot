@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytz
@@ -13,11 +13,11 @@ st.set_page_config(
     layout="centered",
 )
 
-# Advanced High-Contrast Cyberpunk / Neon Theme for News & Alerts
+# Advanced High-Contrast Cyberpunk / Neon Theme (Forex Factory Style Table UI)
 st.markdown(
     """
     <style>
-    /* Background Deep Obsidian & Crimson/Emerald Glow */
+    /* Background Deep Obsidian & Emerald Glow */
     .stApp {
         background: radial-gradient(circle at center, #0a0f1d 0%, #03060a 100%);
         color: #ffffff;
@@ -91,7 +91,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<p class="sub-header">Live Pakistan Time (PKT) Economic Calendar & High-Accuracy Signal Detector</p>',
+    '<p class="sub-header">Live Forex Factory Style Calendar (PKT Time) & High-Accuracy Signal Terminal</p>',
     unsafe_allow_html=True,
 )
 
@@ -119,7 +119,7 @@ ticker_symbol = pairs[selected_pair_name]
 
 
 @st.cache_data(ttl=600)
-def fetch_pakistan_economic_calendar():
+def fetch_forexfactory_style_calendar():
   pkt_zone = pytz.timezone("Asia/Karachi")
   now_pkt = datetime.now(pkt_zone)
   today_str = now_pkt.strftime("%Y-%m-%d")
@@ -133,66 +133,88 @@ def fetch_pakistan_economic_calendar():
     for item in data:
       date_time_utc = item.get("date", "")
       if today_str in date_time_utc:
-        # Convert UTC time from API to Pakistan Standard Time (PKT / UTC+5)
         try:
           dt_utc = datetime.strptime(date_time_utc[:19], "%Y-%m-%dT%H:%M:%S")
           dt_utc = pytz.utc.localize(dt_utc)
           dt_pkt = dt_utc.astimezone(pkt_zone)
-          time_pkt_str = dt_pkt.strftime("%H:%M")
+          time_pkt_str = dt_pkt.strftime("%I:%M %p")  # 12-hour format with AM/PM
         except Exception:
           time_pkt_str = "All Day"
+
+        impact_raw = item.get("impact", "Medium")
+        # Forex Factory style color emojis for impact
+        if impact_raw.lower() == "high":
+          impact_str = "🔴 High"
+        elif impact_raw.lower() == "medium":
+          impact_str = "🟠 Medium"
+        else:
+          impact_str = "🟡 Low"
 
         events.append({
             "Time (PKT)": time_pkt_str,
             "Currency": item.get("country", "USD"),
+            "Impact": impact_str,
             "Economic Event": item.get("title", "Data Release"),
-            "Impact": item.get("impact", "Medium"),
             "Actual": item.get("actual", "Pending"),
             "Forecast": item.get("forecast", "-"),
+            "Previous": item.get("previous", "-"),
         })
 
     if events:
       df_ev = pd.DataFrame(events)
-      return df_ev.sort_values(by="Time (PKT)")
+      return df_ev
     else:
-      return get_fallback_pkt_calendar()
+      return get_fallback_calendar()
   except Exception:
-    return get_fallback_pkt_calendar()
+    return get_fallback_calendar()
 
 
-def get_fallback_pkt_calendar():
+def get_fallback_calendar():
   return pd.DataFrame([
+      {
+          "Time (PKT)": "03:30 PM",
+          "Currency": "EUR",
+          "Impact": "🟠 Medium",
+          "Economic Event": "German Final CPI (MoM)",
+          "Actual": "Pending",
+          "Forecast": "0.1%",
+          "Previous": "0.1%",
+      },
       {
           "Time (PKT)": "05:30 PM",
           "Currency": "USD",
+          "Impact": "🔴 High",
           "Economic Event": "Non-Farm Payrolls (NFP)",
-          "Impact": "High",
           "Actual": "Pending",
           "Forecast": "180K",
+          "Previous": "175K",
       },
       {
           "Time (PKT)": "07:00 PM",
           "Currency": "EUR",
+          "Impact": "🔴 High",
           "Economic Event": "ECB Monetary Policy Rate",
-          "Impact": "High",
           "Actual": "Pending",
           "Forecast": "4.50%",
+          "Previous": "4.50%",
       },
       {
           "Time (PKT)": "09:15 PM",
           "Currency": "GBP",
+          "Impact": "🟠 Medium",
           "Economic Event": "BOE Governor Bailey Speech",
-          "Impact": "Medium",
           "Actual": "-",
           "Forecast": "-",
+          "Previous": "-",
       },
       {
           "Time (PKT)": "11:30 PM",
           "Currency": "USD",
-          "Economic Event": "Retail Sales (MoM)",
-          "Impact": "High",
+          "Impact": "🔴 High",
+          "Economic Event": "Core Retail Sales (MoM)",
           "Actual": "Pending",
           "Forecast": "0.4%",
+          "Previous": "0.5%",
       },
   ])
 
@@ -224,7 +246,7 @@ def analyze_news_market(df):
 
   current_price = float(close.iloc[-1])
 
-  # ATR Calculation for Risk Management
+  # ATR Risk Management
   tr1 = high - low
   tr2 = (high - close.shift()).abs()
   tr3 = (low - close.shift()).abs()
@@ -233,7 +255,7 @@ def analyze_news_market(df):
   if pd.isna(atr):
     atr = current_price * 0.0015
 
-  # Indicators Confluence (EMAs, RSI, MACD)
+  # Technical Indicators Confluence
   ema_9 = close.ewm(span=9, adjust=False).mean().iloc[-1]
   ema_21 = close.ewm(span=21, adjust=False).mean().iloc[-1]
   ema_50 = close.ewm(span=50, adjust=False).mean().iloc[-1]
@@ -307,23 +329,23 @@ def analyze_news_market(df):
 
 
 # Execution Button
-if st.button("🚀 Scan Today's News & Generate Signals", use_container_width=True):
-  with st.spinner("Fetching Pakistan time economic events & running AI signal scan..."):
-    calendar_df = fetch_pakistan_economic_calendar()
+if st.button("🚀 Load Forex Factory Schedule & Signals", use_container_width=True):
+  with st.spinner("Fetching live economic data in Pakistan Time & scanning signals..."):
+    calendar_df = fetch_forexfactory_style_calendar()
     df = fetch_market_data(ticker_symbol)
 
     if not df.empty and "Close" in df.columns:
       summary, buy_pct, sell_pct, price, sl, tp = analyze_news_market(df)
 
       st.markdown("---")
-      st.subheader("📅 Today's Economic News (Pakistan Standard Time - PKT)")
+      st.subheader("📅 Forex Factory Style Live Economic Calendar (PKT)")
       if not calendar_df.empty:
         st.dataframe(calendar_df, use_container_width=True)
       else:
-        st.info("No major news scheduled for today.")
+        st.info("No economic releases scheduled for today.")
 
       st.markdown("---")
-      st.subheader(f"📊 Live Signal Report for: {selected_pair_name}")
+      st.subheader(f"📊 Signal Analysis for: {selected_pair_name}")
 
       price_fmt = f"{price:.5f}" if price < 20 else f"{price:,.2f}"
       st.metric(label="Current Market Price", value=price_fmt)
@@ -335,14 +357,13 @@ if st.button("🚀 Scan Today's News & Generate Signals", use_container_width=Tr
       else:
         st.warning(f"### News Signal: {summary}")
 
-      # Future Alert & Probability
       target_prob = buy_pct if "BUY" in summary else sell_pct
       action_type = "BUY (Bullish)" if "BUY" in summary else "SELL (Bearish)"
 
       st.info(
-          f"⏰ **Upcoming News Impact Alert:** Next incoming high-impact news's"
-          f" volatility indicates a **{target_prob:.1f}% probability** that"
-          f" market will breakout in a **{action_type}** direction."
+          f"⏰ **News Volatility Outlook:** Based on upcoming high-impact events,"
+          f" there is a **{target_prob:.1f}% probability** of a breakout in a"
+          f" **{action_type}** direction."
       )
 
       col_p1, col_p2 = st.columns(2)
@@ -354,12 +375,12 @@ if st.button("🚀 Scan Today's News & Generate Signals", use_container_width=Tr
       st.progress(
           int(buy_pct),
           text=(
-              f"ASZ News AI Probability -> Buy: {buy_pct:.1f}% | Sell:"
+              f"ASZ News Probability -> Buy: {buy_pct:.1f}% | Sell:"
               f" {sell_pct:.1f}%"
           ),
       )
 
-      st.markdown("### 🛡️ News Trading Risk Management (ATR Levels)")
+      st.markdown("### 🛡️ News Risk Management (ATR Levels)")
       sl_fmt = f"{sl:.5f}" if sl < 20 else f"{sl:,.2f}"
       tp_fmt = f"{tp:.5f}" if tp < 20 else f"{tp:,.2f}"
 
@@ -371,8 +392,8 @@ if st.button("🚀 Scan Today's News & Generate Signals", use_container_width=Tr
 
       st.markdown("---")
       st.caption(
-          "💡 **Powered by:** ASZ Forex News Alert | Pakistan Time (PKT) Live"
-          " Calendar & High-Accuracy Engine."
+          "💡 **Powered by:** ASZ Forex News Alert | Forex Factory Calendar Style"
+          " (PKT) & High-Accuracy Terminal."
       )
     else:
       st.error(
