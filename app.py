@@ -13,7 +13,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Advanced High-Contrast Cyberpunk / Neon Theme for Red Folder High Impact News
+# Advanced High-Contrast Cyberpunk / Neon Theme
 st.markdown(
     """
     <style>
@@ -40,13 +40,6 @@ st.markdown(
         font-size: 16px;
         margin-bottom: 25px;
         font-weight: 600;
-    }
-
-    /* Selectbox Styling */
-    .stSelectbox label {
-        color: #ff7675 !important;
-        font-weight: 700;
-        font-size: 16px;
     }
 
     /* Metric Values Styling */
@@ -91,38 +84,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<p class="sub-header">Forex Factory High-Impact (Red Folder) Live Calendar & AI Signal Terminal</p>',
+    '<p class="sub-header">Live Forex Factory High-Impact (Red Folder) Calendar & Auto AI Signals</p>',
     unsafe_allow_html=True,
 )
-
-# Asset Selection for Signal Analysis
-pairs = {
-    "EUR/USD": "EURUSD=X",
-    "GBP/USD": "GBPUSD=X",
-    "USD/JPY": "JPY=X",
-    "AUD/USD": "AUDUSD=X",
-    "USD/CAD": "USDCAD=X",
-    "NZD/USD": "NZDUSD=X",
-    "USD/CHF": "USDCHF=X",
-    "EUR/JPY": "EURJPY=X",
-    "GBP/JPY": "GBPJPY=X",
-    "EUR/GBP": "EURGBP=X",
-    "Gold (XAU/USD)": "GC=F",
-    "Silver (XAG/USD)": "SI=F",
-    "Crude Oil (WTI)": "CL=F",
-    "US Dollar Index (DXY)": "DX-Y.NYB",
-}
-selected_pair_name = st.selectbox(
-    "🌐 Select Forex Asset / Pair for Signal Analysis:", list(pairs.keys())
-)
-ticker_symbol = pairs[selected_pair_name]
 
 
 @st.cache_data(ttl=600)
 def fetch_red_folder_calendar():
   pkt_zone = pytz.timezone("Asia/Karachi")
-  now_pkt = datetime.now(pkt_zone)
-  today_str = now_pkt.strftime("%Y-%m-%d")
 
   try:
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
@@ -131,11 +100,10 @@ def fetch_red_folder_calendar():
 
     events = []
     for item in data:
-      # STRICT FILTER: Only grab High Impact (Red Folder) items
       impact_raw = item.get("impact", "")
+      # STRICT FILTER: Only grab High Impact (Red Folder) items
       if impact_raw.lower() == "high":
         date_time_utc = item.get("date", "")
-        # Convert UTC time to Pakistan Standard Time (PKT)
         try:
           dt_utc = datetime.strptime(date_time_utc[:19], "%Y-%m-%dT%H:%M:%S")
           dt_utc = pytz.utc.localize(dt_utc)
@@ -146,10 +114,11 @@ def fetch_red_folder_calendar():
           time_pkt_str = "All Day"
           date_pkt_str = "Today"
 
+        currency = item.get("country", "USD")
         events.append({
             "Date (PKT)": date_pkt_str,
             "Time (PKT)": time_pkt_str,
-            "Currency": item.get("country", "USD"),
+            "Currency": currency,
             "Impact": "🔴 Red Folder (High)",
             "Economic Event": item.get("title", "High Impact Data"),
             "Actual": item.get("actual", "Pending"),
@@ -236,7 +205,7 @@ def analyze_red_news_market(df):
   if pd.isna(atr):
     atr = current_price * 0.0015
 
-  # Indicators Confluence
+  # Technical Indicators Confluence
   ema_9 = close.ewm(span=9, adjust=False).mean().iloc[-1]
   ema_21 = close.ewm(span=21, adjust=False).mean().iloc[-1]
   ema_50 = close.ewm(span=50, adjust=False).mean().iloc[-1]
@@ -310,74 +279,102 @@ def analyze_red_news_market(df):
 
 
 # Execution Button
-if st.button("🔴 Scan Red Folder News & Generate Signals", use_container_width=True):
-  with st.spinner("Filtering Forex Factory Red Folder (High Impact) events & scanning market..."):
+if st.button("🔴 Fetch Red Folder News & Auto Signals", use_container_width=True):
+  with st.spinner("Fetching live Red Folder events & scanning market signals..."):
     red_calendar_df = fetch_red_folder_calendar()
-    df = fetch_market_data(ticker_symbol)
 
-    if not df.empty and "Close" in df.columns:
-      summary, buy_pct, sell_pct, price, sl, tp = analyze_red_news_market(df)
+    st.markdown("---")
+    st.subheader(
+        "🔴 Forex Factory Red Folder (High Impact) Calendar (PKT Time)"
+    )
+    if not red_calendar_df.empty:
+      st.dataframe(red_calendar_df, use_container_width=True)
 
-      st.markdown("---")
-      st.subheader("🔴 Forex Factory Red Folder (High Impact) Events - PKT Time")
-      if not red_calendar_df.empty:
-        st.dataframe(red_calendar_df, use_container_width=True)
-      else:
-        st.info("No Red Folder high impact news found for right now.")
+      # Automatically pick the currency of the first upcoming Red Folder event to analyze
+      first_currency = red_calendar_df.iloc[0]["Currency"]
+      event_name = red_calendar_df.iloc[0]["Economic Event"]
+      event_time = red_calendar_df.iloc[0]["Time (PKT)"]
+      event_date = red_calendar_df.iloc[0]["Date (PKT)"]
 
-      st.markdown("---")
-      st.subheader(f"📊 Signal Analysis for: {selected_pair_name}")
-
-      price_fmt = f"{price:.5f}" if price < 20 else f"{price:,.2f}"
-      st.metric(label="Current Market Price", value=price_fmt)
-
-      if "BUY" in summary:
-        st.success(f"### Red Folder Signal: {summary}")
-      elif "SELL" in summary:
-        st.error(f"### Red Folder Signal: {summary}")
-      else:
-        st.warning(f"### Red Folder Signal: {summary}")
-
-      target_prob = buy_pct if "BUY" in summary else sell_pct
-      action_type = "BUY (Bullish)" if "BUY" in summary else "SELL (Bearish)"
-
-      st.info(
-          f"⚡ **Red Folder Impact Outlook:** High-impact volatility suggests"
-          f" a **{target_prob:.1f}% probability** that market will break towards"
-          f" the **{action_type}** direction."
+      # Map currency to benchmark ticker symbol automatically
+      currency_map = {
+          "USD": "EURUSD=X",
+          "EUR": "EURUSD=X",
+          "GBP": "GBPUSD=X",
+          "AUD": "AUDUSD=X",
+          "CAD": "USDCAD=X",
+          "JPY": "USDJPY=X",
+          "NZD": "NZDUSD=X",
+          "CHF": "USDCHF=X",
+      }
+      auto_symbol = currency_map.get(first_currency, "EURUSD=X")
+      pair_display = (
+          f"{first_currency}/USD" if first_currency != "USD" else "EUR/USD"
       )
 
-      col_p1, col_p2 = st.columns(2)
-      with col_p1:
-        st.metric(label="🟢 Bullish Probability", value=f"{buy_pct:.1f}%")
-      with col_p2:
-        st.metric(label="🔴 Bearish Probability", value=f"{sell_pct:.1f}%")
+      df = fetch_market_data(auto_symbol)
 
-      st.progress(
-          int(buy_pct),
-          text=(
-              f"Red Folder AI Probability -> Buy: {buy_pct:.1f}% | Sell:"
-              f" {sell_pct:.1f}%"
-          ),
-      )
+      if not df.empty and "Close" in df.columns:
+        summary, buy_pct, sell_pct, price, sl, tp = analyze_red_news_market(df)
 
-      st.markdown("### 🛡️ High-Impact Risk Management (ATR Levels)")
-      sl_fmt = f"{sl:.5f}" if sl < 20 else f"{sl:,.2f}"
-      tp_fmt = f"{tp:.5f}" if tp < 20 else f"{tp:,.2f}"
+        st.markdown("---")
+        st.subheader(
+            f"📊 Auto AI Signal for Upcoming News: [{first_currency}]"
+            f" {event_name}"
+        )
+        st.write(
+            f"🕒 **Scheduled Time:** {event_date} at **{event_time} (PKT)** |"
+            f" **Pair:** {pair_display}"
+        )
 
-      col_sl, col_tp = st.columns(2)
-      with col_sl:
-        st.metric(label="🛑 Stop-Loss (Risk Limit)", value=sl_fmt)
-      with col_tp:
-        st.metric(label="🎯 Take-Profit (Target)", value=tp_fmt)
+        price_fmt = f"{price:.5f}" if price < 20 else f"{price:,.2f}"
+        st.metric(label="Live Benchmark Price", value=price_fmt)
 
-      st.markdown("---")
-      st.caption(
-          "💡 **Powered by:** ASZ Red Folder News Alert | Forex Factory High-Impact"
-          " Filter (PKT) & Precision AI."
-      )
+        if "BUY" in summary:
+          st.success(f"### Red Folder Signal: {summary}")
+        elif "SELL" in summary:
+          st.error(f"### Red Folder Signal: {summary}")
+        else:
+          st.warning(f"### Red Folder Signal: {summary}")
+
+        target_prob = buy_pct if "BUY" in summary else sell_pct
+        action_type = "BUY (Bullish)" if "BUY" in summary else "SELL (Bearish)"
+
+        st.info(
+            f"⚡ **Market Impact Outlook:** Based on live volatility, there is"
+            f" a **{target_prob:.1f}% probability** that the market will move"
+            f" in a **{action_type}** direction."
+        )
+
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+          st.metric(label="🟢 Bullish Probability", value=f"{buy_pct:.1f}%")
+        with col_p2:
+          st.metric(label="🔴 Bearish Probability", value=f"{sell_pct:.1f}%")
+
+        st.progress(
+            int(buy_pct),
+            text=(
+                f"Red Folder AI Probability -> Buy: {buy_pct:.1f}% | Sell:"
+                f" {sell_pct:.1f}%"
+            ),
+        )
+
+        st.markdown("### 🛡️ High-Impact Risk Management (ATR Levels)")
+        sl_fmt = f"{sl:.5f}" if sl < 20 else f"{sl:,.2f}"
+        tp_fmt = f"{tp:.5f}" if tp < 20 else f"{tp:,.2f}"
+
+        col_sl, col_tp = st.columns(2)
+        with col_sl:
+          st.metric(label="🛑 Stop-Loss (Risk Limit)", value=sl_fmt)
+        with col_tp:
+          st.metric(label="🎯 Take-Profit (Target)", value=tp_fmt)
+
     else:
-      st.error(
-          "⚠️ Data fetch failed for this asset. Please check network or try"
-          " another pair."
-      )
+      st.warning("No Red Folder high impact news found.")
+
+    st.markdown("---")
+    st.caption(
+        "💡 **Powered by:** ASZ Red Folder News Alert | Automated Forex Factory"
+        " High-Impact Engine (PKT)."
+    )
