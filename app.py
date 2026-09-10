@@ -3,20 +3,14 @@ import pandas as pd
 import pytz
 import requests
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 
 # ---------------- CONFIG ---------------- #
-st.set_page_config(page_title="ASZ Pro News Bot", layout="wide")
+st.set_page_config(
+    page_title="ASZ Pro News Bot", page_icon="🔴", layout="wide"
+)
 
 st.title("🔴 ASZ Forex News Bot (Advanced)")
 st.caption("Live High Impact News + Smart Signal Engine")
-
-# ---------------- SETTINGS ---------------- #
-auto_refresh_toggle = st.toggle("🔄 Auto Refresh (30s)", value=False)
-
-if auto_refresh_toggle:
-  # Refresh every 30 seconds (30000 milliseconds)
-  st_autorefresh(interval=30000, key="datarefresh")
 
 # ---------------- FETCH NEWS ---------------- #
 
@@ -30,7 +24,6 @@ def fetch_news():
     data = res.json()
 
     pkt = pytz.timezone("Asia/Karachi")
-
     news_list = []
 
     for item in data:
@@ -78,14 +71,13 @@ def get_signal(actual, forecast):
 
 
 # ---------------- UI ---------------- #
-if st.button("🚀 Load News & Signals") or auto_refresh_toggle:
-
+if st.button("🚀 Load News & Signals", type="primary"):
   df = fetch_news()
 
   if df.empty:
-    st.warning("No news available or API blocked")
+    st.warning("No high-impact news available right now or API restricted.")
   else:
-    st.success("✅ Live High Impact News")
+    st.success("✅ Live High Impact News Loaded Successfully")
 
     st.dataframe(df, use_container_width=True)
 
@@ -93,7 +85,6 @@ if st.button("🚀 Load News & Signals") or auto_refresh_toggle:
     st.subheader("📊 Top News Signal")
 
     first = df.iloc[0]
-
     signal, reason = get_signal(first["Actual"], first["Forecast"])
 
     col1, col2 = st.columns(2)
@@ -112,6 +103,11 @@ if st.button("🚀 Load News & Signals") or auto_refresh_toggle:
         st.warning(signal)
 
     st.info(f"🧠 Reason: {reason}")
+else:
+  st.info(
+      "👈 Click the **'Load News & Signals'** button above to fetch the latest"
+      " forex news."
+  )
 
 # ---------------- FOOTER ---------------- #
 st.markdown("---")
