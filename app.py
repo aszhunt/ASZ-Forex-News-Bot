@@ -2,14 +2,17 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import yfinance as yf
-import ta
+from groq import Groq
 
-st.set_page_config(page_title="ASZ PRO NEWS BOT", layout="wide")
+# ---------------- CONFIG ---------------- #
+st.set_page_config(page_title="ASZ SIMPLE PRO BOT", layout="centered")
+st.title("🔴 ASZ News + AI Signal Bot")
 
-st.title("🔴 ASZ HYBRID NEWS + TECH BOT")
+# 👉 Apni Groq API key yahan lagao
+GROQ_API_KEY = "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"
+client = Groq(api_key=GROQ_API_KEY)
 
-# ---------------- FETCH FOREX FACTORY ---------------- #
+# ---------------- FETCH NEWS ---------------- #
 @st.cache_data(ttl=300)
 def fetch_news():
     url = "https://www.forexfactory.com/calendar"
@@ -46,97 +49,84 @@ def fetch_news():
 
     return pd.DataFrame(data)
 
-# ---------------- TECHNICAL ANALYSIS ---------------- #
-def get_market_trend(pair="EURUSD=X"):
-    df = yf.download(pair, period="1d", interval="5m")
-
-    df["EMA50"] = ta.trend.ema_indicator(df["Close"], window=50)
-    df["RSI"] = ta.momentum.rsi(df["Close"], window=14)
-
-    last = df.iloc[-1]
-
-    trend = "UP" if last["Close"] > last["EMA50"] else "DOWN"
-    rsi = last["RSI"]
-
-    return trend, rsi
-
-# ---------------- NEWS LOGIC ---------------- #
-def news_bias(event):
-    event = event.lower()
-
-    if "nfp" in event or "employment" in event:
-        return "STRONG"
-    elif "cpi" in event or "inflation" in event:
-        return "VOLATILE"
-    elif "rate" in event:
-        return "VERY STRONG"
-    else:
-        return "NORMAL"
-
-# ---------------- FINAL SIGNAL ---------------- #
-def generate_signal(actual, forecast, trend, rsi):
+# ---------------- BASIC SIGNAL ---------------- #
+def basic_signal(actual, forecast):
     try:
-        actual = float(actual.replace("K","").replace("%",""))
-        forecast = float(forecast.replace("K","").replace("%",""))
+        a = float(actual.replace("K","").replace("%",""))
+        f = float(forecast.replace("K","").replace("%",""))
 
-        # News reaction
-        if actual > forecast:
-            news_dir = "BUY"
-        elif actual < forecast:
-            news_dir = "SELL"
+        if a > f:
+            return "BUY"
+        elif a < f:
+            return "SELL"
         else:
-            return "WAIT", "Neutral news"
-
-        # Technical confirmation
-        if news_dir == "BUY" and trend == "UP" and rsi > 50:
-            return "STRONG BUY", "News + Trend + RSI aligned"
-        elif news_dir == "SELL" and trend == "DOWN" and rsi < 50:
-            return "STRONG SELL", "News + Trend + RSI aligned"
-        else:
-            return "WAIT", "Conflict between news & technical"
-
+            return "WAIT"
     except:
-        return "WAIT", "Data not released yet"
+        return "WAIT"
+
+# ---------------- GROQ AI ANALYSIS ---------------- #
+def ai_analysis(event, currency, actual, forecast, previous):
+    prompt = f"""
+You are a professional forex analyst.
+
+Event: {event}
+Currency: {currency}
+Actual: {actual}
+Forecast: {forecast}
+Previous: {previous}
+
+Give:
+1. BUY or SELL or WAIT
+2. Short reason
+3. Market expectation
+
+Be precise and realistic.
+"""
+
+    try:
+        chat = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return chat.choices[0].message.content
+    except:
+        return "AI not available"
 
 # ---------------- UI ---------------- #
-pair = st.selectbox("Select Pair", ["EURUSD=X","GBPUSD=X","USDJPY=X","XAUUSD=X"])
-
-if st.button("🚀 Run PRO Analysis"):
-
-    st.subheader("📊 Market Analysis")
-
-    trend, rsi = get_market_trend(pair)
-
-    st.write(f"Trend: **{trend}**")
-    st.write(f"RSI: **{rsi:.2f}**")
+if st.button("🚀 Fetch News & Generate Signal"):
 
     df = fetch_news()
 
     if df.empty:
-        st.error("No news data found")
+        st.error("No news data found (Forex Factory may block request)")
     else:
         st.subheader("🔴 High Impact News")
         st.dataframe(df)
 
         first = df.iloc[0]
 
-        bias = news_bias(first["Event"])
+        st.subheader("📊 BASIC SIGNAL")
 
-        signal, reason = generate_signal(
+        signal = basic_signal(first["Actual"], first["Forecast"])
+
+        if signal == "BUY":
+            st.success("BUY 🚀")
+        elif signal == "SELL":
+            st.error("SELL 🔻")
+        else:
+            st.warning("WAIT ⏳")
+
+        st.subheader("🧠 AI ANALYSIS (Groq)")
+
+        ai_result = ai_analysis(
+            first["Event"],
+            first["Currency"],
             first["Actual"],
             first["Forecast"],
-            trend,
-            rsi
+            first["Previous"]
         )
 
-        st.subheader("🔥 FINAL SIGNAL")
+        st.write(ai_result)
 
-        if "BUY" in signal:
-            st.success(signal)
-        elif "SELL" in signal:
-            st.error(signal)
-        else:
-            st.warning(signal)
-
-        st.write(f"🧠 Reason: {reason}")
-        st.write(f"📢 Event Strength: {bias}")
+# ---------------- FOOTER ---------------- #
+st.caption("ASZ Simple Pro Bot | News + AI Hybrid")
