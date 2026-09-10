@@ -1,59 +1,45 @@
 import streamlit as st
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
-from groq import Groq
 
-# ---------------- CONFIG ---------------- #
-st.set_page_config(page_title="ASZ SIMPLE PRO BOT", layout="centered")
-st.title("🔴 ASZ News + AI Signal Bot")
+st.set_page_config(page_title="ASZ News Bot", layout="centered")
 
-# 👉 Apni Groq API key yahan lagao
-GROQ_API_KEY = "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"
-client = Groq(api_key=GROQ_API_KEY)
+st.title("🔴 ASZ Forex News Bot (Simple & Working)")
 
-# ---------------- FETCH NEWS ---------------- #
+# -------- FETCH NEWS (WORKING SOURCE) -------- #
 @st.cache_data(ttl=300)
 def fetch_news():
-    url = "https://www.forexfactory.com/calendar"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 
-    res = requests.get(url, headers=headers)
-    soup = BeautifulSoup(res.text, "html.parser")
+    try:
+        res = requests.get(url, timeout=10)
+        data = res.json()
 
-    rows = soup.select("tr.calendar__row")
+        news_list = []
 
-    data = []
-
-    for row in rows:
-        try:
-            impact = row.select_one(".impact").text.strip()
-            if "High" not in impact:
+        for item in data:
+            if item.get("impact", "").lower() != "high":
                 continue
 
-            currency = row.select_one(".calendar__currency").text.strip()
-            event = row.select_one(".calendar__event").text.strip()
-            actual = row.select_one(".calendar__actual").text.strip()
-            forecast = row.select_one(".calendar__forecast").text.strip()
-            previous = row.select_one(".calendar__previous").text.strip()
-
-            data.append({
-                "Currency": currency,
-                "Event": event,
-                "Actual": actual,
-                "Forecast": forecast,
-                "Previous": previous
+            news_list.append({
+                "Currency": item.get("country", ""),
+                "Event": item.get("title", ""),
+                "Actual": item.get("actual", ""),
+                "Forecast": item.get("forecast", ""),
+                "Previous": item.get("previous", ""),
+                "Time": item.get("date", "")
             })
-        except:
-            continue
 
-    return pd.DataFrame(data)
+        return pd.DataFrame(news_list)
 
-# ---------------- BASIC SIGNAL ---------------- #
-def basic_signal(actual, forecast):
+    except:
+        return pd.DataFrame()
+
+# -------- SIGNAL LOGIC -------- #
+def get_signal(actual, forecast):
     try:
-        a = float(actual.replace("K","").replace("%",""))
-        f = float(forecast.replace("K","").replace("%",""))
+        a = float(str(actual).replace("K","").replace("%",""))
+        f = float(str(forecast).replace("K","").replace("%",""))
 
         if a > f:
             return "BUY"
@@ -64,50 +50,22 @@ def basic_signal(actual, forecast):
     except:
         return "WAIT"
 
-# ---------------- GROQ AI ANALYSIS ---------------- #
-def ai_analysis(event, currency, actual, forecast, previous):
-    prompt = f"""
-You are a professional forex analyst.
-
-Event: {event}
-Currency: {currency}
-Actual: {actual}
-Forecast: {forecast}
-Previous: {previous}
-
-Give:
-1. BUY or SELL or WAIT
-2. Short reason
-3. Market expectation
-
-Be precise and realistic.
-"""
-
-    try:
-        chat = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return chat.choices[0].message.content
-    except:
-        return "AI not available"
-
-# ---------------- UI ---------------- #
-if st.button("🚀 Fetch News & Generate Signal"):
+# -------- UI -------- #
+if st.button("🚀 Fetch Forex News"):
 
     df = fetch_news()
 
     if df.empty:
-        st.error("No news data found (Forex Factory may block request)")
+        st.error("❌ News fetch nahi ho rahi (network ya source issue)")
     else:
-        st.subheader("🔴 High Impact News")
+        st.success("✅ Live High Impact News")
         st.dataframe(df)
 
         first = df.iloc[0]
 
-        st.subheader("📊 BASIC SIGNAL")
+        st.subheader("📊 Signal")
 
-        signal = basic_signal(first["Actual"], first["Forecast"])
+        signal = get_signal(first["Actual"], first["Forecast"])
 
         if signal == "BUY":
             st.success("BUY 🚀")
@@ -116,17 +74,7 @@ if st.button("🚀 Fetch News & Generate Signal"):
         else:
             st.warning("WAIT ⏳")
 
-        st.subheader("🧠 AI ANALYSIS (Groq)")
-
-        ai_result = ai_analysis(
-            first["Event"],
-            first["Currency"],
-            first["Actual"],
-            first["Forecast"],
-            first["Previous"]
-        )
-
-        st.write(ai_result)
-
-# ---------------- FOOTER ---------------- #
-st.caption("ASZ Simple Pro Bot | News + AI Hybrid")
+        st.write(f"Currency: {first['Currency']}")
+        st.write(f"Event: {first['Event']}")
+        st.write(f"Actual: {first['Actual']}")
+        st.write(f"Forecast: {first['Forecast']}")
