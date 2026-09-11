@@ -59,7 +59,7 @@ st.markdown(
 )
 
 # Hardcoded Groq API Key
-GROQ_API_KEY = "gsk_your_actual_groq_api_key_here"
+GROQ_API_KEY = "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"
 
 
 # Fetch Data Function
@@ -167,7 +167,7 @@ if not df.empty:
                     "Running advanced macro predictive algorithms..."
                 ):
                     completion = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                        model="openai/gpt-oss-120b",
                         messages=[
                             {
                                 "role": "system",
