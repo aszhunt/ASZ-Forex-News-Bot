@@ -1,149 +1,153 @@
-import streamlit as st
-import pandas as pd
+import os
 import requests
-from datetime import datetime
+from bs4 import BeautifulSoup
+import pandas as pd
+import streamlit as st
+from groq import Groq
 
-st.set_page_config(page_title="Forex News AI Signal", layout="wide")
-
-st.title("📊 Forex News + AI Signal (PRO VERSION)")
-
-# ----------------------------
-# MULTI SOURCE FETCH (VERY IMPORTANT)
-# ----------------------------
-@st.cache_data(ttl=300)
-def fetch_news():
-
-    # ---- SOURCE 1 (Primary API)
-    try:
-        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-        data = requests.get(url, timeout=10).json()
-
-        rows = []
-        for item in data:
-            dt = item.get("date")
-
-            if dt:
-                dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-                date = dt_obj.strftime("%Y-%m-%d")
-                time = dt_obj.strftime("%H:%M")
-            else:
-                date, time = "N/A", "N/A"
-
-            rows.append({
-                "Date": date,
-                "Time": time,
-                "Currency": item.get("country", "N/A"),
-                "Impact": item.get("impact", "Low"),
-                "Event": item.get("title", "N/A")
-            })
-
-        df = pd.DataFrame(rows)
-        if not df.empty:
-            return df
-
-    except:
-        pass
-
-    # ---- SOURCE 2 (Backup API)
-    try:
-        url = "https://economic-calendar.tradingview.com/events"
-        res = requests.get(url, timeout=10)
-        data = res.json().get("result", [])
-
-        rows = []
-        for item in data:
-            ts = item.get("time", 0)
-            dt_obj = datetime.fromtimestamp(ts)
-
-            rows.append({
-                "Date": dt_obj.strftime("%Y-%m-%d"),
-                "Time": dt_obj.strftime("%H:%M"),
-                "Currency": item.get("country", "N/A"),
-                "Impact": item.get("importance", "Low"),
-                "Event": item.get("title", "N/A")
-            })
-
-        df = pd.DataFrame(rows)
-        if not df.empty:
-            return df
-
-    except:
-        pass
-
-    # ---- SOURCE 3 (FINAL FALLBACK – NEVER EMPTY)
-    return pd.DataFrame([
-        {"Date": "2026-01-01", "Time": "12:30", "Currency": "USD", "Impact": "High", "Event": "CPI"},
-        {"Date": "2026-01-01", "Time": "14:00", "Currency": "EUR", "Impact": "Medium", "Event": "ECB Speech"},
-        {"Date": "2026-01-01", "Time": "09:00", "Currency": "GBP", "Impact": "Low", "Event": "GDP"},
-    ])
-
-
-df = fetch_news()
-
-# ----------------------------
-# SAFETY
-# ----------------------------
-for col in ["Date","Time","Currency","Impact","Event"]:
-    if col not in df.columns:
-        df[col] = "N/A"
-
-# ----------------------------
-# FILTERS (FIXED)
-# ----------------------------
-st.sidebar.header("Filters")
-
-currency_filter = st.sidebar.multiselect(
-    "Currency",
-    options=sorted(df["Currency"].unique()),
-    default=sorted(df["Currency"].unique())
+# Page Config
+st.set_page_config(
+    page_title="Forex AI Signal & Calendar", page_icon="📈", layout="wide"
 )
 
-impact_filter = st.sidebar.multiselect(
-    "Impact",
-    options=sorted(df["Impact"].unique()),
-    default=sorted(df["Impact"].unique())
+st.title("⚡ Forex Factory Live Calendar & AI Signal Predictor")
+st.markdown(
+    "Real-time economic calendar tracker powered by Groq AI for instant market predictions."
 )
 
-filtered_df = df[
-    (df["Currency"].isin(currency_filter)) &
-    (df["Impact"].isin(impact_filter))
-]
+# Sidebar for API Key
+st.sidebar.header("Configuration")
+groq_api_key = st.sidebar.text_input(
+    "Enter Groq API Key", type="password", help="Get your key from console.groq.com"
+)
 
-# ----------------------------
-# AI SIGNAL ENGINE (IMPROVED)
-# ----------------------------
-def signal_logic(impact):
-    impact = str(impact).lower()
+# Function to fetch Forex Factory Calendar (using public RSS/XML feed or scraper fallback)
 
-    if "high" in impact:
-        return "🔥 STRONG VOLATILITY (WAIT BREAKOUT)"
-    elif "medium" in impact:
-        return "⚠️ POSSIBLE MOVE"
+
+@st.cache_data(ttl=300)  # Cache data for 5 minutes
+def fetch_forex_calendar():
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            df = pd.DataFrame(data)
+            return df
+        else:
+            return None
+    except Exception as e:
+        return None
+
+
+# Load Data
+with st.spinner("Fetching live Forex Factory data..."):
+    df_calendar = fetch_forex_calendar()
+
+if df_calendar is not None and not df_calendar.empty:
+    # Rename/Clean columns for easy reading
+    # Usually keys are: title, country, date, impact, forecast, previous, etc.
+    st.sidebar.success("Live Calendar Connected Successfully!")
+
+    # Filters
+    st.sidebar.subheader("Filter News")
+    impact_filter = st.sidebar.multiselect(
+        "Select Impact Level",
+        options=["High", "Medium", "Low", "None"],
+        default=["High", "Medium"],
+    )
+
+    # Filter dataframe based on impact
+    if "impact" in df_calendar.columns:
+        filtered_df = df_calendar[
+            df_calendar["impact"].isin(impact_filter)
+        ].copy()
     else:
-        return "⏳ LOW IMPACT"
+        filtered_df = df_calendar.copy()
 
-filtered_df["Signal"] = filtered_df["Impact"].apply(signal_logic)
+    st.subheader(
+        f"📅 Upcoming Economic Events ({len(filtered_df)} events found)"
+    )
 
-# ----------------------------
-# DISPLAY
-# ----------------------------
-st.subheader("📅 Live Forex News (Date + Time Working ✅)")
-st.dataframe(filtered_df, use_container_width=True)
+    # Display clean table
+    st.dataframe(
+        filtered_df[
+            [
+                col
+                for col in [
+                    "date",
+                    "country",
+                    "title",
+                    "impact",
+                    "forecast",
+                    "previous",
+                ]
+                if col in filtered_df.columns
+            ]
+        ],
+        use_container_width=True,
+    )
 
-# ----------------------------
-# MARKET INSIGHT
-# ----------------------------
-st.subheader("🧠 Market Insight")
+    # AI Signal Prediction Section
+    st.markdown("---")
+    st.subheader("🤖 Groq AI Market Impact & Signal Analyzer")
 
-if filtered_df["Impact"].str.contains("High", case=False).any():
-    st.success("⚡ High Impact News Coming → Avoid Blind Entry")
+    selected_event_title = st.selectbox(
+        "Select an upcoming news event to analyze signal:",
+        options=filtered_df["title"].unique()
+        if "title" in filtered_df.columns
+        else [],
+    )
+
+    if st.button("Generate AI Trade Signal") and selected_event_title:
+        if not groq_api_key:
+            st.error("Please enter your Groq API Key in the sidebar first.")
+        else:
+            # Extract specific event details
+            event_row = filtered_df[
+                filtered_df["title"] == selected_event_title
+            ].iloc[0]
+
+            prompt = f"""
+            You are an expert forex trader and macroeconomic analyst. 
+            Analyze the following upcoming economic event and predict the market signal and impact:
+            
+            Event Title: {event_row.get('title', 'N/A')}
+            Country: {event_row.get('country', 'N/A')}
+            Impact Level: {event_row.get('impact', 'N/A')}
+            Forecast: {event_row.get('forecast', 'N/A')}
+            Previous: {event_row.get('previous', 'N/A')}
+            
+            Provide:
+            1. Short-term market direction (Bullish/Bearish/Neutral for relevant currency pairs).
+            2. Expected volatility level.
+            3. Detailed trading recommendation / risk warning.
+            Keep it professional, concise, and structured.
+            """
+
+            try:
+                client = Groq(api_key=groq_api_key)
+                with st.spinner("Analyzing market patterns via Groq Llama 3..."):
+                    chat_completion = client.chat.completions.create(
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a senior forex technical and fundamental analyst.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        model="llama-3.3-70b-versatile",
+                        temperature=0.3,
+                    )
+                    ai_response = chat_completion.choices[0].message.content
+                    st.success("Analysis Complete!")
+                    st.markdown(ai_response)
+            except Exception as e:
+                st.error(f"Error connecting to Groq API: {e}")
+
 else:
-    st.info("Market Calm")
-
-# ----------------------------
-# SIGNALS
-# ----------------------------
-st.subheader("📈 Signals")
-
-for _, row in filtered_df.iterrows():
-    st.write(f"{row['Date']} {row['Time']} | {row['Currency']} | {row['Event']} → {row['Signal']}")
+    st.warning(
+        "Could not fetch data directly from standard feeds. Please check your internet connection or try again later."
+    )
+    st.info(
+        "Tip: You can deploy this on Streamlit Community Cloud for free and access it anywhere!"
+    )
