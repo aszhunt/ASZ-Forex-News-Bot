@@ -8,65 +8,43 @@ st.set_page_config(
     page_title="ASZ Forex News Bot", page_icon="⚡", layout="wide"
 )
 
-# Custom Neon Multi-Color CSS (Green, Blue, Purple Theme)
+# High-Readability Clean Neon & Dark Professional CSS
 st.markdown(
     """
     <style>
-    /* Main Background & Font Styling */
     .stApp {
-        background: linear-gradient(135deg, #0d0f18 0%, #131722 50%, #1a0b2e 100%);
-        color: #e0e6ed;
+        background-color: #0b0f19;
+        color: #f1f5f9;
     }
-    
-    /* Neon Header Title Styling */
-    .neon-title {
-        font-size: 2.8rem;
+    .main-title {
+        font-size: 2.5rem;
         font-weight: 800;
-        background: linear-gradient(90deg, #00ff87, #60efff, #b967ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #38bdf8;
         text-align: center;
         margin-bottom: 0px;
-        padding-top: 10px;
-        text-shadow: 0 0 20px rgba(96, 239, 255, 0.3);
     }
-    
-    .neon-subtitle {
+    .sub-title {
         text-align: center;
-        color: #a0aec0;
-        font-size: 1.1rem;
-        margin-bottom: 30px;
+        color: #94a3b8;
+        font-size: 1rem;
+        margin-bottom: 25px;
     }
-
-    /* Custom Cards and Containers */
     div.stButton > button {
-        background: linear-gradient(90deg, #00ff87, #60efff);
-        color: #0b0e14;
-        font-weight: bold;
+        background: linear-gradient(90deg, #0284c7, #2563eb);
+        color: #ffffff;
+        font-weight: 700;
         border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.2rem;
-        box-shadow: 0 0 15px rgba(0, 255, 135, 0.4);
-        transition: 0.3s ease;
+        border-radius: 6px;
+        padding: 0.6rem 1.5rem;
+        width: 100%;
     }
     div.stButton > button:hover {
-        background: linear-gradient(90deg, #60efff, #b967ff);
+        background: linear-gradient(90deg, #0ea5e9, #3b82f6);
         color: #ffffff;
-        box-shadow: 0 0 25px rgba(185, 103, 255, 0.6);
-        transform: translateY(-2px);
     }
-
-    /* Sidebar Styling */
     [data-testid="stSidebar"] {
-        background-color: #0f121a;
-        border-right: 1px solid rgba(185, 103, 255, 0.2);
-    }
-    
-    /* Dataframe Table styling customization */
-    [data-testid="stDataFrame"] {
-        border: 1px solid rgba(96, 239, 255, 0.3);
-        border-radius: 10px;
-        box-shadow: 0 0 15px rgba(13, 15, 24, 0.8);
+        background-color: #0f172a;
+        border-right: 1px solid #1e293b;
     }
     </style>
 """,
@@ -74,9 +52,9 @@ st.markdown(
 )
 
 # Header Section
-st.markdown('<p class="neon-title">⚡ ASZ Forex News Bot ⚡</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">⚡ ASZ Forex News Bot ⚡</p>', unsafe_allow_html=True)
 st.markdown(
-    '<p class="neon-subtitle">Advanced Real-Time Economic Calendar & AI Signal Intelligence Hub</p>',
+    '<p class="sub-title">Advanced Institutional Economic Calendar & High-Accuracy Directional Predictor</p>',
     unsafe_allow_html=True,
 )
 
@@ -98,21 +76,18 @@ def load_forex_data():
         return pd.DataFrame()
 
 
-# Main execution flow
-with st.spinner("Connecting to global economic feeds..."):
+with st.spinner("Connecting to global liquidity feeds..."):
     df = load_forex_data()
 
 if not df.empty:
-    st.sidebar.success("🟢 Live Feed Connected")
+    st.sidebar.success("🟢 Live Feed Active")
 
-    # Normalize impact column
     if "impact" in df.columns:
         df["impact"] = df["impact"].fillna("None").astype(str)
         available_impacts = df["impact"].unique().tolist()
     else:
         available_impacts = ["High", "Medium", "Low", "None"]
 
-    # Sidebar Filters
     st.sidebar.markdown("### 🎛️ Filter Controls")
     selected_impacts = st.sidebar.multiselect(
         "Select Impact Severity",
@@ -124,17 +99,15 @@ if not df.empty:
         else [],
     )
 
-    # Filter dataframe
     if selected_impacts and "impact" in df.columns:
         filtered_df = df[df["impact"].isin(selected_impacts)].copy()
     else:
         filtered_df = df.copy()
 
     st.markdown(
-        f"### 📅 Active Schedule Feed ({len(filtered_df)} events tracked)"
+        f"### 📅 Live Schedule Stream ({len(filtered_df)} events tracked)"
     )
 
-    # Display clean table
     display_cols = [
         col
         for col in ["date", "country", "title", "impact", "forecast", "previous"]
@@ -142,9 +115,11 @@ if not df.empty:
     ]
     st.dataframe(filtered_df[display_cols], use_container_width=True)
 
-    # AI Prediction Section
+    # Advanced Signal Prediction Section
     st.markdown("---")
-    st.markdown("### 🤖 Groq AI Future Signal & Market Impact Intelligence")
+    st.markdown(
+        "### 🤖 High-Accuracy AI Signal Predictor (BUY / SELL Analysis)"
+    )
 
     event_titles = (
         filtered_df["title"].unique().tolist()
@@ -152,11 +127,11 @@ if not df.empty:
         else []
     )
     selected_event = st.selectbox(
-        "Select target event for institutional signal analysis:",
+        "Select target event for high-accuracy directional prediction:",
         options=event_titles,
     )
 
-    if st.button("🚀 Generate Predictive Signal") and selected_event:
+    if st.button("🎯 Execute High-Accuracy Direction Prediction") and selected_event:
         if (
             not GROQ_API_KEY
             or GROQ_API_KEY == "gsk_your_actual_groq_api_key_here"
@@ -170,39 +145,40 @@ if not df.empty:
             ].iloc[0]
 
             prompt = f"""
-            You are a master institutional forex desk trader and macro liquidity strategist.
-            Analyze this upcoming economic release and synthesize a tactical trading blueprint:
+            You are a senior institutional algorithmic forex trader and liquidity modeler with 20 years of experience.
+            Analyze the following upcoming economic event data with high precision and predict the definitive market direction:
             
-            - Event Release: {event_row.get('title', 'N/A')}
-            - Region/Currency: {event_row.get('country', 'N/A')}
+            - Event Title: {event_row.get('title', 'N/A')}
+            - Country / Currency: {event_row.get('country', 'N/A')}
             - Impact Level: {event_row.get('impact', 'N/A')}
-            - Market Forecast: {event_row.get('forecast', 'N/A')}
-            - Previous Data: {event_row.get('previous', 'N/A')}
+            - Market Consensus Forecast: {event_row.get('forecast', 'N/A')}
+            - Previous Value: {event_row.get('previous', 'N/A')}
             
-            Structure your professional response with:
-            1. Short-term Directional Bias (Bullish / Bearish / Range-bound for correlated pairs).
-            2. Volatility Expectation (Low / Moderate / High-Impact Spike).
-            3. Actionable Setup / Risk Assessment Protocol.
+            Your response must strictly provide a high-accuracy trading blueprint structured as follows:
+            1. **Primary Directional Signal:** CLEARLY state **BUY** or **SELL** (along with the specific major currency pair affected, e.g., EUR/USD, GBP/USD, USD/JPY).
+            2. **Confidence Level:** Provide an estimated accuracy percentage score based on deviation potential.
+            3. **Market Mechanics / Why:** Brief fundamental reasoning regarding how deviation between Forecast and Actual release triggers institutional order flow.
+            4. **Execution Protocol:** Suggested entry stance, volatility caution, and invalidation risk level.
             """
 
             try:
                 client = Groq(api_key=GROQ_API_KEY)
                 with st.spinner(
-                    "Running advanced AI macro computations via Groq..."
+                    "Running advanced macro predictive algorithms..."
                 ):
                     completion = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
                         messages=[
                             {
                                 "role": "system",
-                                "content": "You are a professional financial market strategist.",
+                                "content": "You are a professional elite algorithmic forex trading strategist.",
                             },
                             {"role": "user", "content": prompt},
                         ],
-                        temperature=0.3,
+                        temperature=0.2,
                     )
                     ai_output = completion.choices[0].message.content
-                    st.success("Signal Generated Successfully!")
+                    st.success("High-Accuracy Signal Computed Successfully!")
                     st.markdown(ai_output)
             except Exception as ex:
                 st.error(f"Groq API connection error: {ex}")
