@@ -1,80 +1,68 @@
 import streamlit as st
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
-import random
+from datetime import datetime
 
 st.set_page_config(page_title="Forex News AI Signal", layout="wide")
 
-st.title("📊 Forex News + AI Signal App")
+st.title("📊 Forex News + AI Signal (REAL DATA)")
 
 # ----------------------------
-# FETCH FOREX FACTORY DATA (SAFE)
+# FETCH REAL DATA (API)
 # ----------------------------
 @st.cache_data(ttl=300)
-def get_forex_news():
-    url = "https://www.forexfactory.com/calendar"
-    headers = {"User-Agent": "Mozilla/5.0"}
+def get_news():
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 
     try:
-        res = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(res.text, "html.parser")
+        data = requests.get(url, timeout=10).json()
 
-        events = soup.find_all("tr")
+        rows = []
 
-        data = []
-
-        for event in events:
+        for item in data:
             try:
-                currency = event.find("td", {"class": "calendar__currency"})
-                impact = event.find("td", {"class": "calendar__impact"})
-                title = event.find("td", {"class": "calendar__event"})
-                time = event.find("td", {"class": "calendar__time"})
+                dt = item.get("date", "")
+                currency = item.get("country", "")
+                impact = item.get("impact", "")
+                event = item.get("title", "")
 
-                if currency and impact and title:
-                    impact_span = impact.find("span")
-                    impact_text = impact_span["title"] if impact_span else "Low"
+                # Convert datetime
+                if dt:
+                    dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                    date = dt_obj.strftime("%Y-%m-%d")
+                    time = dt_obj.strftime("%H:%M")
+                else:
+                    date = "N/A"
+                    time = "N/A"
 
-                    data.append({
-                        "Currency": currency.text.strip(),
-                        "Impact": impact_text,
-                        "Event": title.text.strip(),
-                        "Time": time.text.strip() if time else "N/A"
-                    })
+                rows.append({
+                    "Date": date,
+                    "Time": time,
+                    "Currency": currency,
+                    "Impact": impact,
+                    "Event": event
+                })
+
             except:
                 continue
 
-        df = pd.DataFrame(data)
+        df = pd.DataFrame(rows)
 
-        # ✅ if empty → fallback data
         if df.empty:
-            df = get_dummy_data()
+            return pd.DataFrame(columns=["Date","Time","Currency","Impact","Event"])
 
         return df
 
     except:
-        return get_dummy_data()
+        return pd.DataFrame(columns=["Date","Time","Currency","Impact","Event"])
 
 
-# ----------------------------
-# BACKUP DATA (NO CRASH GUARANTEE)
-# ----------------------------
-def get_dummy_data():
-    return pd.DataFrame([
-        {"Currency": "USD", "Impact": "High Impact Expected", "Event": "CPI", "Time": "12:30"},
-        {"Currency": "EUR", "Impact": "Medium Impact Expected", "Event": "ECB Speech", "Time": "14:00"},
-        {"Currency": "GBP", "Impact": "Low Impact Expected", "Event": "GDP", "Time": "09:00"},
-    ])
-
-
-df = get_forex_news()
+df = get_news()
 
 # ----------------------------
-# SAFETY CHECK (CRASH FIX)
+# SAFETY CHECK
 # ----------------------------
-required_cols = ["Currency", "Impact", "Event", "Time"]
-
-for col in required_cols:
+for col in ["Date","Time","Currency","Impact","Event"]:
     if col not in df.columns:
         df[col] = "N/A"
 
@@ -83,19 +71,16 @@ for col in required_cols:
 # ----------------------------
 st.sidebar.header("Filters")
 
-currency_options = df["Currency"].dropna().unique().tolist()
-impact_options = df["Impact"].dropna().unique().tolist()
-
 currency_filter = st.sidebar.multiselect(
-    "Select Currency",
-    options=currency_options,
-    default=currency_options
+    "Currency",
+    df["Currency"].unique(),
+    default=df["Currency"].unique()
 )
 
 impact_filter = st.sidebar.multiselect(
-    "Impact Level",
-    options=impact_options,
-    default=impact_options
+    "Impact",
+    df["Impact"].unique(),
+    default=df["Impact"].unique()
 )
 
 filtered_df = df[
@@ -104,40 +89,40 @@ filtered_df = df[
 ]
 
 # ----------------------------
-# AI SIGNAL LOGIC (SMARTER)
+# AI SIGNAL LOGIC (BETTER)
 # ----------------------------
 def generate_signal(impact):
-    if "High" in impact:
-        return random.choice(["🔥 STRONG BUY", "🔥 STRONG SELL"])
-    elif "Medium" in impact:
-        return random.choice(["BUY", "SELL"])
+    impact = impact.lower()
+
+    if "high" in impact:
+        return "🔥 STRONG MOVE EXPECTED"
+    elif "medium" in impact:
+        return "⚠️ MEDIUM VOLATILITY"
     else:
-        return "WAIT"
+        return "⏳ WAIT / LOW IMPACT"
 
 filtered_df["Signal"] = filtered_df["Impact"].apply(generate_signal)
 
 # ----------------------------
 # DISPLAY
 # ----------------------------
-st.subheader("📅 Live News Calendar")
+st.subheader("📅 Live Forex News (Date + Time FIXED)")
 st.dataframe(filtered_df, use_container_width=True)
 
 # ----------------------------
 # SUMMARY
 # ----------------------------
-st.subheader("🧠 AI Market Insight")
+st.subheader("🧠 Market Insight")
 
-high_news = filtered_df[filtered_df["Impact"].str.contains("High", na=False)]
-
-if not high_news.empty:
-    st.success("⚡ High Impact News → High Volatility Expected")
+if filtered_df["Impact"].str.contains("High", case=False).any():
+    st.success("⚡ High Impact News Coming → Big Moves Possible")
 else:
-    st.info("Market likely stable")
+    st.info("Market Calm")
 
 # ----------------------------
 # SIGNAL BOARD
 # ----------------------------
-st.subheader("📈 Quick Signals")
+st.subheader("📈 Signals")
 
 for _, row in filtered_df.iterrows():
-    st.write(f"{row['Currency']} | {row['Event']} → {row['Signal']}")
+    st.write(f"{row['Date']} {row['Time']} | {row['Currency']} | {row['Event']} → {row['Signal']}")
